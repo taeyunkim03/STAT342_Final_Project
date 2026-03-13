@@ -1,0 +1,296 @@
+---
+title: "Your Paper Title Here"
+author: "Your Name(s)"
+date: Date
+output: pdf_document
+urlcolor: blue
+header-includes:
+- \usepackage{amsmath,amsfonts,amssymb}
+- \usepackage{setspace} \doublespacing
+fontsize: 11pt
+---
+
+```{r setup, include=FALSE}
+#Use this code chunk to include libraries, and set global options.
+```
+
+# Abstract
+Write your abstract here.
+
+# Keywords
+*Keyword 1*, *Keyword 2*, *Keyword 3*, *Keyword 4*
+
+\newpage
+
+# Introduction / Background
+Provide an introduction with background information.
+
+```{r label="important_R_code", eval=TRUE, echo=FALSE}
+# You can reference your code in the appendix (sample here).
+```
+
+# Statistical Methods
+
+## Model
+Describe the statistical model used.
+
+## Likelihood Inference
+Detail the likelihood approach.
+
+## Likelihood Inference
+
+Let $T$ denote the number of infections observed in the vaccine group among the
+total $n=170$ infections recorded in the clinical trial. We assume
+
+\[
+T \sim \text{Binomial}(n,\pi),
+\]
+
+where $\pi = P(\text{infection occurs in the vaccine group} \mid \text{infection})$.
+In the observed data, $t=8$ infections occurred in the vaccine group and
+$162$ occurred in the placebo group.
+
+The parameter of scientific interest is the vaccine efficacy $\psi$, defined as
+
+\[
+\psi = \frac{\pi_p - \pi_v}{\pi_p},
+\]
+
+where $\pi_v$ and $\pi_p$ denote the probabilities of infection in the vaccine
+and placebo groups respectively. Under the binomial formulation of the trial
+data, this relationship can be written in terms of $\pi$ as
+
+\[
+\psi = \frac{1-2\pi}{1-\pi}.
+\]
+
+---
+
+### Likelihood Function
+
+The likelihood function for $\pi$ is
+
+\[
+L(\pi)
+= P(T=t|\pi)
+= \binom{n}{t}\pi^t(1-\pi)^{n-t}.
+\]
+
+Taking the logarithm gives the log-likelihood function
+
+\[
+\ell(\pi)
+= \log L(\pi)
+= t\log(\pi) + (n-t)\log(1-\pi).
+\]
+
+The maximum likelihood estimator (MLE) is obtained by maximizing the likelihood
+function. For the binomial model, the MLE has the closed form
+
+\[
+\hat{\pi}_{MLE} = \frac{T}{n}.
+\]
+
+Because maximum likelihood estimators are invariant under transformation,
+the MLE for vaccine efficacy is
+
+\[
+\hat{\psi}_{MLE}
+=
+\frac{1-2\hat{\pi}}{1-\hat{\pi}}.
+\]
+
+---
+
+### Large Sample Inference
+
+Under regularity conditions and for sufficiently large sample sizes,
+the MLE is approximately normally distributed:
+
+\[
+\hat{\pi}_{MLE}
+\approx
+N\left(\pi, \frac{\pi(1-\pi)}{n}\right).
+\]
+
+This result allows us to construct an approximate $(1-\alpha)$ confidence
+interval for $\pi$ using
+
+\[
+\hat{\pi} \pm z_{\alpha/2}
+\sqrt{\frac{\hat{\pi}(1-\hat{\pi})}{n}}.
+\]
+
+The endpoints of this interval can then be transformed using the relationship
+between $\psi$ and $\pi$ to obtain a confidence interval for vaccine efficacy.
+
+---
+
+### Likelihood Ratio Test
+
+To assess whether the vaccine efficacy meets the regulatory benchmark,
+we test the hypothesis
+
+\[
+H_0 : \psi = 0.3
+\qquad
+\text{versus}
+\qquad
+H_1 : \psi \ne 0.3.
+\]
+
+The likelihood ratio test statistic is
+
+\[
+W = 2\left[\ell(\hat{\pi}) - \ell(\pi_0)\right],
+\]
+
+where $\pi_0$ corresponds to the null value of $\psi$ and is obtained from
+
+\[
+\pi_0 = \frac{1-\psi_0}{2-\psi_0}.
+\]
+
+Under the null hypothesis and standard regularity conditions,
+the test statistic is approximately distributed as
+
+\[
+W \sim \chi^2_1.
+\]
+
+The corresponding $p$-value is obtained using the chi-square distribution.
+
+---
+
+### Bootstrap Confidence Interval
+
+To quantify uncertainty without relying solely on asymptotic theory,
+we also construct a parametric bootstrap confidence interval for $\psi$.
+Bootstrap samples are generated according to
+
+\[
+T^* \sim \text{Binomial}(n,\hat{\pi}),
+\]
+
+and the corresponding estimator $\hat{\psi}^*$ is calculated for each
+bootstrap sample. The empirical $2.5\%$ and $97.5\%$ quantiles of the
+bootstrap distribution provide a $95\%$ percentile confidence interval
+for $\psi$.
+
+## Bayesian Inference
+Detail the Bayesian approach.
+
+# Results
+Present your findings. 
+
+
+```{r}
+# Data from Pfizer trial
+n <- 170        # total infections
+t <- 8          # infections in vaccine group
+
+# -------------------------
+# MLE for pi
+# -------------------------
+pi_hat <- t/n
+pi_hat
+
+# -------------------------
+# MLE for vaccine efficacy psi
+# psi = (1 - 2*pi)/(1 - pi)
+# -------------------------
+psi_hat <- (1 - 2*pi_hat)/(1 - pi_hat)
+psi_hat
+
+
+# -------------------------
+# Log-likelihood function
+# -------------------------
+loglik <- function(pi, t, n){
+  if(pi <= 0 | pi >= 1) return(-Inf)
+  dbinom(t, size=n, prob=pi, log=TRUE)
+}
+
+# evaluate likelihood across grid
+pi_vals <- seq(0.001,0.999,length=1000)
+ll_vals <- sapply(pi_vals, loglik, t=t, n=n)
+
+plot(pi_vals, ll_vals, type="l",
+     xlab="pi",
+     ylab="log-likelihood",
+     main="Log-Likelihood Function")
+
+
+# -------------------------
+# Large sample CI for pi
+# -------------------------
+se_pi <- sqrt(pi_hat*(1-pi_hat)/n)
+
+ci_pi <- pi_hat + c(-1,1)*qnorm(0.975)*se_pi
+ci_pi
+
+
+# -------------------------
+# Convert CI to psi scale
+# -------------------------
+psi_transform <- function(pi){
+  (1-2*pi)/(1-pi)
+}
+
+ci_psi <- psi_transform(ci_pi)
+ci_psi
+
+
+# -------------------------
+# Likelihood Ratio Test
+# H0: psi = 0.3
+# -------------------------
+
+psi0 <- 0.3
+
+# convert psi0 to pi0
+pi0 <- (1 - psi0)/(2 - psi0)
+
+# likelihood ratio statistic
+W <- 2*(loglik(pi_hat,t,n) - loglik(pi0,t,n))
+W
+
+# p-value from chi-square distribution
+p_value <- 1 - pchisq(W, df=1)
+p_value
+
+
+# -------------------------
+# Parametric bootstrap CI
+# -------------------------
+B <- 10000
+
+boot_pi <- rbinom(B, n, pi_hat)/n
+boot_psi <- psi_transform(boot_pi)
+
+boot_ci <- quantile(boot_psi, c(0.025,0.975))
+boot_ci
+```
+
+
+# Discussion / Conclusion
+Discuss / conclude here.
+
+# Bibliography
+
+Brown, B. (2024). *Lecture Title*. Lecture slides, Course Name, University Name.
+
+Doe, J. (2020). Title of the Paper. *Journal Name*, 12(3), 45-67.
+
+Last, F., & Last, F. (2025). *Book Title*. Publisher.
+
+Smith, A., & Johnson, C. (2023). *Title of the Online Article*. Retrieved from https://www.example.com.
+
+# Appendix
+
+## Code
+```{r ref.label = "important_R_code", eval=FALSE}
+```
+
+## Proofs
+If applicable, include detailed mathematical derivations or additional theoretical explanations.
