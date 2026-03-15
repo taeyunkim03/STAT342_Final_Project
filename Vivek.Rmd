@@ -1,0 +1,151 @@
+---
+title: "Your Paper Title Here"
+author: "Your Name(s)"
+date: Date
+output: pdf_document
+urlcolor: blue
+header-includes:
+- \usepackage{amsmath,amsfonts,amssymb}
+- \usepackage{setspace} \doublespacing
+fontsize: 11pt
+---
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(LearnBayes)
+library(HDInterval)
+```
+
+# Abstract
+Write your abstract here.
+
+# Keywords
+*Keyword 1*, *Keyword 2*, *Keyword 3*, *Keyword 4*
+
+\newpage
+
+# Introduction / Background
+
+In December 2020, the BNT162b2 vaccine made by Pfizer and BioNTech received an Emergency Use Authorization (EUA) from the FDA, which was a really big deal in the fight against the COVID-19 pandemic. This vaccine was a two-dose shot and it worked differently than some of the other vaccines being developed at the time. For example, vaccines from companies like Janssen and AstraZeneca used a viral vector approach, but BNT162b2 instead used something called mRNA, which is wrapped in lipid nanoparticles and works by teaching your immune system to recognize the spike protein on the virus. To figure out whether this new type of vaccine actually worked, a large clinical trial was run across multiple countries and published by Polack et al. (2020). The trial was placebo-controlled and double-blinded, meaning neither the participants nor the researchers knew who got the real vaccine. Over 34,000 people were randomly split into two equal groups, one got the vaccine and one got a placebo, in a 1:1 ratio. The study was set up to end once 170 total confirmed COVID-19 cases were recorded among people who had no prior signs of infection. When those 170 cases were counted up, only 8 of them came from the vaccine group ($n = 17,411$), while 162 came from the placebo group ($n = 17,511$). That works out to an infection rate of about 0.046% for the vaccinated group versus 0.925% for the placebo group, which is a pretty striking difference.
+
+```{r intro-plots, echo=FALSE, fig.show='hold', out.width='50%'}
+trial_matrix <- matrix(c(8, 17411-8, 162, 17511-162), 
+                       nrow = 2, 
+                       dimnames = list(Outcome = c("Infected", "Healthy"),
+                                       Group = c("BNT162b2", "Placebo")))
+
+rates <- trial_matrix["Infected", ] / colSums(trial_matrix)
+barplot(rates, 
+        main="Figure 1: Infection Rate by Group", 
+        ylab="Proportion of Cases", 
+        col=c("skyblue", "salmon"),
+        ylim=c(0, 0.01))
+
+array <- as.array(trial_matrix)
+mosaicplot(array, main="Figure 2: Mosaic Plot of Distribution", sub = NULL, xlab = NULL, ylab = NULL,
+           sort = NULL, off = NULL, dir = NULL,
+           color = c("skyblue","salmon"), shade = FALSE, margin = NULL,
+           cex.axis = 0.66, las = par("las"), border = NULL)
+```
+
+This analysis seeks to evaluate the efficacy of the vaccine based on these findings. Specifically, we test whether the vaccine efficacy ($\psi$) is significantly greater than the 30% threshold required for regulatory approval. We show our research goal through the hypotheses $H_0: \psi = 0.3$ versus $H_1: \psi > 0.3$.
+
+# Statistical Methods
+
+## Model
+Describe the statistical model used.
+
+## Likelihood Inference
+Detail the likelihood approach.
+
+## Bayesian Inference
+
+```{r bayes-setup, echo=FALSE, message=FALSE}
+# Prior Elicitation
+# We want P(psi >= 0.3) = 0.05.
+# Using the transformation pi = (1-psi)/(2-psi):
+# If psi = 0.3, then pi = (1-0.3)/(2-0.3) = 0.7/1.7 = 0.41176
+# We look for a Beta(a, b) where the 5th percentile is 0.41176 and the median is 0.5.
+prior_params <- beta.select(quantile1 = list(p = 0.05, x = 0.7/1.7), 
+                            quantile2 = list(p = 0.5, x = 0.5))
+a_prior <- prior_params[1]  # 43.04
+b_prior <- prior_params[2]  # 43.04
+
+# Observed Data
+t_obs <- 8      # Infections in vaccine group
+n_total <- 170  # Total infections
+
+# Posterior via conjugacy: Beta(a + t, b + n - t)
+a_post <- a_prior + t_obs
+b_post <- b_prior + (n_total - t_obs)
+
+# Posterior summaries on pi scale
+post_median_pi <- qbeta(0.5, a_post, b_post)
+post_hdi_pi    <- hdi(qbeta, credMass = 0.95, shape1 = a_post, shape2 = b_post)
+
+# Transform back to psi scale
+post_median_psi <- (1 - 2 * post_median_pi) / (1 - post_median_pi)
+post_hdi_psi    <- (1 - 2 * post_hdi_pi)    / (1 - post_hdi_pi)
+
+# Posterior probability P(psi > 0.3 | data) = P(pi < 0.41176 | data)
+prob_efficacy_gt_30 <- pbeta(0.7/1.7, a_post, b_post)
+```
+For the Bayesian approach, we first need to choose a prior distribution for $\pi$, which basically just means we need to say what we believe about $\pi$ before we even look at the data. We chose to use a Beta prior, so $\pi \sim \text{Beta}(a, b)$, which is a convenient choice because when you use it with a binomial likelihood, the posterior ends up being a Beta distribution too. To actually figure out what values to use for $a$ and $b$, we did something called prior elicitation, where we started from a "pessimistic" view of how well the vaccine works. We set the prior median of $\pi$ to $0.5$, which means we're starting with the assumption that a vaccinated and unvaccinated person are equally likely to get infected. We also said there's only a 5% chance the vaccine meets the FDA's required 30% efficacy threshold, so $P(\psi \geq 0.30) = 0.05$. To convert that into something usable on the $\pi$ scale, we used the transformation $\pi = \frac{1-\psi}{2-\psi}$, which gives us a 5th percentile of about $0.4118$. Plugging both of those constraints in gave us:
+$$a = 43.04, \quad b = 43.04$$
+The likelihood function, which describes how probable our data is for a given value of $\pi$, comes from the binomial distribution:
+$$f(t \mid \pi) = \binom{n}{t} \pi^t (1-\pi)^{n-t}$$
+Then using Bayes' Theorem, the posterior is proportional to the likelihood times the prior. The posterior will then be updated with the Beta parameters by adding in the observed data:
+$$\pi \mid t \sim \text{Beta}(a + t, \; b + n - t)$$
+With $t = 8$ infections in the vaccine group and $n = 170$ total cases, this gives us a posterior of $\pi \mid t \sim \text{Beta}(51.04, 205.04)$. From there, we transformed everything back to the $\psi$ scale to get the posterior median, a 95% Highest Posterior Density Interval (HPDI), and the posterior probability $P(\psi > 0.30 \mid t)$.
+
+```{r bayes-plot, echo=FALSE, message=FALSE, fig.cap="Figure 3: Prior and Posterior Distribution of pi"}
+x <- seq(0, 1, length.out = 500)
+df <- data.frame(
+  pi = rep(x, 2),
+  pdf = c(dbeta(x, a_prior, b_prior), dbeta(x, a_post, b_post)),
+  distribution = rep(c("Prior", "Posterior"), each = 500)
+)
+
+ggplot(df, aes(x = pi, y = pdf, color = distribution)) +
+  geom_line(linewidth = 1) +
+  labs(title = "Prior and Posterior Distribution of \u03c0",
+       x = expression(pi),
+       y = "Density") +
+  theme_minimal() +
+  scale_color_manual(values = c("Prior" = "gray60", "Posterior" = "firebrick"))
+```
+
+# Results
+
+Using the Bayesian method, we can get a probability-based estimate of the vaccine efficacy parameter $\psi$ by working through the posterior distribution of $\pi$. Starting with our pessimistic prior ($\text{Beta}(43.04, 43.04)$) and plugging in the trial data of 8 vaccine infections out of 170 total cases, the posterior distribution for $\pi$ came out to be $\text{Beta}(51.04, 205.04)$. The posterior median for $\pi$ was 0.199, and when we converted that to the efficacy scale using the formula $\psi = \frac{1-2\pi}{1-\pi}$, we got a posterior median vaccine efficacy of 75.1%. To show how uncertain we are about that estimate, we calculated a 95% Highest Posterior Density Interval (HPDI) for $\psi$, which came out to [66.5%, 82.2%]. We also wanted to test whether the data supported the hypothesis $H_1: \psi > 0.3$, so we calculated the posterior probability that the vaccine efficacy exceeds the FDA's 30% threshold. That probability, $P(\psi > 0.30 \mid \text{data})$, turned out to be greater than 0.9999, which is really strong evidence in favor of the vaccine. All of these results are laid out in Table 2.
+
+| Metric | Posterior Estimate |
+|:---|:---|
+| Posterior Median ($\psi$) | 75.1% |
+| 95% HPDI ($\psi$) | [66.5%, 82.2%] |
+| $P(\psi > 0.30 \mid \text{data})$ | > 0.9999 |
+
+Table: Bayesian Posterior Summaries for Vaccine Efficacy ($\psi$)
+
+# Discussion / Conclusion
+Discuss / conclude here.
+
+# Bibliography
+
+Grove, R. (2026). *Physicians-Health-Study.pdf*. Lecture slides, STAT 342, University of Washington.
+
+Grove, R. (2026). *bayes-inference.pdf*. Lecture slides, STAT 342, University of Washington.
+
+Grove, R. (2026). *likelihood-inference.pdf*. Lecture slides, STAT 342, University of Washington.
+
+Polack, F. P., Thomas, S. J., Kitchin, N., Absalon, J., Gurtman, A., Lockhart, S., . . . Gruber, W. C. (2020). Safety and Efficacy of the BNT162b2 mRNA Covid-19 Vaccine. *New England Journal of Medicine*, *383*(27), 2603--2615.
+
+# Appendix
+
+## Code
+
+```{r ref.label=c("intro-plots", "bayes-setup", "bayes-plot"), eval=FALSE}
+```
+
+## Proofs
+If applicable, include detailed mathematical derivations or additional theoretical explanations.
