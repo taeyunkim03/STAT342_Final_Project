@@ -273,6 +273,13 @@ boot_ci
 ```
 
 
+
+Using the likelihood-based approach, we estimated the infection probability parameter $\pi$ using the Pfizer trial data, where 8 infections occurred in the vaccine group out of 170 total infections. The maximum likelihood estimate (MLE) for $\pi$ was $\hat{\pi} = 0.0471$. Converting this estimate to the vaccine efficacy scale using the transformation $\psi = \frac{1-2\pi}{1-\pi}$, we obtained an estimated vaccine efficacy of $\hat{\psi} = 0.951$, or approximately $95.1\%$ efficacy. This estimate suggests that the vaccine is highly effective at reducing infection risk in the trial population.
+
+To quantify the uncertainty in this estimate, we first constructed a large-sample $95\%$ confidence interval for $\pi$, which was $[0.0152, 0.0789]$. After transforming these endpoints to the efficacy scale, this corresponds to a vaccine efficacy interval of approximately $[91.4\%, 98.5\%]$, indicating that even at the lower bound the vaccine remains highly effective. We also performed a likelihood ratio test of the hypothesis $H_0 : \psi = 0.3$, which corresponds to the FDA's minimum acceptable efficacy threshold of $30\%$. The resulting test statistic was $W = 121.60$, producing a p-value essentially equal to $0$. This provides overwhelming evidence against the null hypothesis and strongly supports that the vaccine efficacy substantially exceeds the $30\%$ benchmark.
+
+Finally, to further assess uncertainty without relying solely on asymptotic approximations, we conducted a parametric bootstrap with $10{,}000$ simulated samples. The resulting bootstrap $95\%$ confidence interval for vaccine efficacy was $[91.0\%, 98.2\%]$, which is very consistent with the large-sample interval. Taken together, the likelihood estimate, hypothesis test, and bootstrap results all provide strong and consistent evidence that the vaccine has very high efficacy.
+
 # Discussion / Conclusion
 Discuss / conclude here.
 
